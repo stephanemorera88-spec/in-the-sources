@@ -16,7 +16,9 @@ vi.mock("@/lib/license", async () => (await import("../../../_lib/test-support")
 vi.mock("@/lib/db", () => db);
 vi.mock("@/lib/engines", () => engines);
 
-import { POST } from "./route";
+import { SITE_FETCH_TIMEOUT_MS } from "@/lib/engines/site-text";
+import { SUGGEST_TIMEOUT_MS } from "@/lib/engines/suggest";
+import { POST, maxDuration } from "./route";
 
 const project: Project = {
   id: "prj_1",
@@ -38,6 +40,12 @@ beforeEach(() => {
 });
 
 describe("POST /api/projects/[id]/suggest", () => {
+  it("declares a budget that covers the whole site read plus two model attempts", () => {
+    expect(maxDuration).toBe(120);
+    expect(SUGGEST_TIMEOUT_MS).toBeLessThanOrEqual(30_000);
+    expect(SITE_FETCH_TIMEOUT_MS + 2 * SUGGEST_TIMEOUT_MS + 10_000).toBeLessThanOrEqual(maxDuration * 1000);
+  });
+
   it("returns 400 with a plain message when no engine key is set, without reading the site", async () => {
     db.getEngineKeys.mockResolvedValue({});
     const res = await POST(jsonRequest("/api/projects/prj_1/suggest", "POST"), ctx({ id: "prj_1" }));

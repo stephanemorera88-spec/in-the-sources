@@ -3,7 +3,10 @@ import "../server-only";
 /**
  * Site text for prompt suggestions (SPEC.md, fetchSiteText). Tries
  * https://domain/llms.txt first, then the home page with markup stripped,
- * at most SITE_TEXT_MAX_CHARS characters.
+ * at most SITE_TEXT_MAX_CHARS characters. SITE_FETCH_TIMEOUT_MS is one
+ * budget for the whole read, both files and every redirect hop included
+ * (review fix, 2026-10-01: per-hop timeouts let a slow site hold the suggest
+ * route for eight hops).
  *
  * A private or malformed address throws (the caller shows the message).
  * A site that cannot be fetched returns "" so suggestions still run on the
@@ -62,16 +65,17 @@ async function discard(res: Response): Promise<void> {
   }
 }
 
-/** Follows up to MAX_REDIRECTS hops by hand so every hop goes through the guard. */
-async function guardedFetch(url: string, fetchImpl: FetchLike, timeoutMs: number): Promise<Response | null> {
+/** Follows up to MAX_REDIRECTS hops by hand so every hop goes through the guard. One signal covers every hop. */
+async function guardedFetch(url: string, fetchImpl: FetchLike, signal: AbortSignal): Promise<Response | null> {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (signal.aborted) return null;
     const check = validateScanUrl(current);
     if ("error" in check) return null;
     const res = await fetchImpl(check.url, {
       method: "GET",
       redirect: "manual",
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
       headers: {
         "user-agent": USER_AGENT,
         accept: "text/plain, text/markdown, text/html;q=0.9, */*;q=0.1",
@@ -165,9 +169,11 @@ export async function fetchSiteText(
   const origin = new URL(check.url).origin;
   const fetchImpl = deps.fetch ?? globalThis.fetch;
   const timeoutMs = deps.timeoutMs ?? SITE_FETCH_TIMEOUT_MS;
+  // One budget for everything below: llms.txt, the home page and their redirect hops share this signal.
+  const signal = AbortSignal.timeout(timeoutMs);
 
   try {
-    const res = await guardedFetch(`${origin}/llms.txt`, fetchImpl, timeoutMs);
+    const res = await guardedFetch(`${origin}/llms.txt`, fetchImpl, signal);
     if (res) {
       const type = (res.headers.get("content-type") ?? "").toLowerCase();
       if (res.status === 200 && (type.startsWith("text/plain") || type.startsWith("text/markdown"))) {
@@ -182,7 +188,7 @@ export async function fetchSiteText(
   }
 
   try {
-    const res = await guardedFetch(`${origin}/`, fetchImpl, timeoutMs);
+    const res = await guardedFetch(`${origin}/`, fetchImpl, signal);
     if (!res) return "";
     if (!res.ok) {
       await discard(res);

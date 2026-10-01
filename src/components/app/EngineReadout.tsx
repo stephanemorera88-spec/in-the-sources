@@ -42,7 +42,9 @@ export function EngineReadout({ latestRun }: { latestRun: RunSummary | null }) {
               <>
                 <p className="mt-1 font-serif text-[1.5rem] leading-none tracking-[-0.025em] text-ink-50">No answers</p>
                 <p className="mt-2 text-[14px] text-ink-50">
-                  {rate ? "Every call to this engine failed in this run." : "No key for this engine when the run started."}
+                  {rate && rate.attempted > 0
+                    ? "Every call to this engine failed in this run."
+                    : "No key for this engine when the run started."}
                 </p>
               </>
             )}

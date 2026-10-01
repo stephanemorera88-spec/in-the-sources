@@ -15,7 +15,12 @@ import { ANTHROPIC_MODEL, GEMINI_MODEL, OPENAI_MODEL } from "./models";
  * web search here; the site text is the grounding.
  */
 export const SUGGEST_COUNT = 10;
-export const SUGGEST_TIMEOUT_MS = 60_000;
+/**
+ * Per attempt, no SDK retries. Budget of the suggest route (maxDuration 120):
+ * SITE_FETCH_TIMEOUT_MS for the site read plus two attempts of this, 70 s
+ * worst case (review fix, 2026-10-01).
+ */
+export const SUGGEST_TIMEOUT_MS = 30_000;
 const SITE_TEXT_LIMIT = 8000;
 
 export const SUGGEST_SYSTEM_PROMPT =
@@ -72,10 +77,20 @@ export function parseSuggestions(raw: string): string[] | null {
   return out.length ? out : null;
 }
 
-async function completeWithEngine(engine: EngineId, apiKey: string, system: string, user: string): Promise<string> {
+async function completeWithEngine(
+  engine: EngineId,
+  apiKey: string,
+  system: string,
+  user: string,
+  fetchImpl?: typeof fetch
+): Promise<string> {
+  // maxRetries 0 and attempts 1: the SDKs retry a timeout while retries remain, which would double the
+  // model time against the route budget. The fetch seam exists for the tests only (openai client.d.ts
+  // line 129, @anthropic-ai/sdk client.d.ts line 108, genai.d.ts HttpOptions.fetch line 8447).
+  const fetchOption = fetchImpl ? { fetch: fetchImpl } : {};
   if (engine === "openai") {
     // node_modules/openai/client.d.ts line 62 (apiKey); responses.d.ts lines 8912 (model), 8889 (instructions), 8881 (input), 8975 (reasoning).
-    const client = new OpenAI({ apiKey, maxRetries: 1 });
+    const client = new OpenAI({ apiKey, maxRetries: 0, ...fetchOption });
     const response = await client.responses.create(
       { model: OPENAI_MODEL, instructions: system, input: user, reasoning: { effort: "low" } },
       { timeout: SUGGEST_TIMEOUT_MS }
@@ -84,7 +99,7 @@ async function completeWithEngine(engine: EngineId, apiKey: string, system: stri
   }
   if (engine === "anthropic") {
     // node_modules/@anthropic-ai/sdk/client.d.ts line 42 (apiKey); messages.d.ts lines 3582 (model), 3506 (max_tokens), 3651 (system), 3575 (messages).
-    const client = new Anthropic({ apiKey, maxRetries: 1 });
+    const client = new Anthropic({ apiKey, maxRetries: 0, ...fetchOption });
     const message = await client.messages.create(
       { model: ANTHROPIC_MODEL, max_tokens: 1500, system, messages: [{ role: "user", content: user }] },
       { timeout: SUGGEST_TIMEOUT_MS }
@@ -100,7 +115,7 @@ async function completeWithEngine(engine: EngineId, apiKey: string, system: stri
   const response = await ai.models.generateContent({
     model: GEMINI_MODEL,
     contents: user,
-    config: { systemInstruction: system, httpOptions: { timeout: SUGGEST_TIMEOUT_MS, retryOptions: { attempts: 2 } } },
+    config: { systemInstruction: system, httpOptions: { timeout: SUGGEST_TIMEOUT_MS, retryOptions: { attempts: 1 }, ...fetchOption } },
   });
   return response.text ?? ""; // GenerateContentResponse.text getter, line 6320
 }
@@ -113,12 +128,13 @@ export async function suggestPrompts(
   keys: EngineKeys,
   project: ProjectInput,
   siteText: string,
-  deps: { complete?: CompleteFn } = {}
+  deps: { complete?: CompleteFn; fetch?: typeof fetch } = {}
 ): Promise<string[]> {
   const engine = ENGINES.find((id) => (keys[id] ?? "").trim().length > 0);
   if (!engine) throw new Error("Add at least one engine API key in Settings before asking for suggestions.");
   const apiKey = (keys[engine] ?? "").trim();
-  const complete = deps.complete ?? completeWithEngine;
+  const complete: CompleteFn =
+    deps.complete ?? ((id, key, system, input) => completeWithEngine(id, key, system, input, deps.fetch));
   const user = buildSuggestPrompt(project, siteText);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {

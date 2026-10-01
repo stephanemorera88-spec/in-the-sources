@@ -13,7 +13,7 @@ import { CompetitorLeaderboard } from "./CompetitorLeaderboard";
 import { EngineReadout } from "./EngineReadout";
 import { PromptTable } from "./PromptTable";
 import { TrendChart } from "./TrendChart";
-import { formatDateTime, formatPercent, scrubKeyLike } from "./format";
+import { ENGINE_LABELS, formatDateTime, formatPercent, scrubKeyLike } from "./format";
 
 function summary(runId: string, startedAt: string, rates: Array<[RunSummary["perEngine"][number]["engine"], number | null, number | null]>): RunSummary {
   return {
@@ -22,6 +22,7 @@ function summary(runId: string, startedAt: string, rates: Array<[RunSummary["per
     status: "complete",
     perEngine: rates.map(([engine, citationRate, mentionRate]) => ({
       engine,
+      attempted: citationRate === null ? 0 : 10,
       answered: citationRate === null ? 0 : 10,
       cited: citationRate === null ? 0 : Math.round(citationRate * 10),
       mentioned: mentionRate === null ? 0 : Math.round(mentionRate * 10),
@@ -62,6 +63,22 @@ describe("EngineReadout", () => {
     expect(html).toContain("No answers");
     expect(html).toContain("No key for this engine");
     expect(html).not.toContain(String.fromCharCode(0x2014));
+  });
+
+  it("tells an engine without a key apart from one whose calls all failed", () => {
+    const run = summary("run_1", "2026-10-01T10:00:00.000Z", [
+      ["openai", null, null],
+      ["anthropic", null, null],
+    ]);
+    // OpenAI made three calls and every one errored; Anthropic had no key, so the run holds no row for it.
+    run.perEngine[0].attempted = 3;
+    const html = renderToStaticMarkup(createElement(EngineReadout, { latestRun: run }));
+    const openai = html.slice(html.indexOf(ENGINE_LABELS.openai), html.indexOf(ENGINE_LABELS.anthropic));
+    const anthropic = html.slice(html.indexOf(ENGINE_LABELS.anthropic), html.indexOf(ENGINE_LABELS.gemini));
+    expect(openai).toContain("Every call to this engine failed in this run.");
+    expect(openai).not.toContain("No key for this engine");
+    expect(anthropic).toContain("No key for this engine when the run started.");
+    expect(anthropic).not.toContain("Every call to this engine failed");
   });
 });
 

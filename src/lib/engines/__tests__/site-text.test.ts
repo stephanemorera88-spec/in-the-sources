@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SITE_TEXT_MAX_CHARS, fetchSiteText, htmlToText, validateScanUrl } from "../site-text";
-import { fakeFetch } from "./helpers";
+import { fakeFetch, tick } from "./helpers";
 
 function textResponse(body: string, type = "text/plain; charset=utf-8", status = 200): Response {
   return new Response(body, { status, headers: { "content-type": type } });
@@ -93,6 +93,27 @@ describe("fetchSiteText", () => {
     const long = routes({ "https://evoix.io/llms.txt": () => textResponse("a".repeat(SITE_TEXT_MAX_CHARS + 500)) });
     const text = await fetchSiteText("evoix.io", { fetch: long });
     expect(text).toHaveLength(SITE_TEXT_MAX_CHARS);
+  });
+
+  it("spends one budget on the whole read: every hop shares a signal and nothing starts after the deadline", async () => {
+    const signals = new Set<AbortSignal | null | undefined>();
+    let hops = 0;
+    // Each hop answers after 15 ms with a redirect to a fresh public URL, honoring the caller's signal.
+    const chain = fakeFetch(async (_req, init) => {
+      signals.add(init?.signal);
+      if (init?.signal?.aborted) throw Object.assign(new Error("aborted"), { name: "AbortError" });
+      await tick(15);
+      hops += 1;
+      return new Response(null, { status: 302, headers: { location: `https://evoix.io/hop${hops}` } });
+    });
+
+    const started = Date.now();
+    await expect(fetchSiteText("evoix.io", { fetch: chain, timeoutMs: 40 })).resolves.toBe("");
+
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(signals.size).toBe(1);
+    // Per-hop timeouts would walk all eight hops (four per file); one 40 ms budget allows three or four.
+    expect(chain.requests.length).toBeLessThanOrEqual(4);
   });
 
   it("throws for a private or malformed address before any request", async () => {

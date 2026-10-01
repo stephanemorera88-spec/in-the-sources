@@ -118,6 +118,15 @@ describe("askGemini", () => {
     expect(answer.error).not.toContain(KEY);
   });
 
+  it("does not retry a server error", async () => {
+    // 500 is in the SDK's default retry set; attempts 1 means the first try is the only try.
+    const fetchImpl = fakeFetch(() => jsonResponse({ error: { code: 500, message: "internal", status: "INTERNAL" } }, 500));
+    const answer = await askGemini(KEY, "What is evoix.io?", { fetch: fetchImpl, timeoutMs: 5000 });
+    expect(answer.text).toBe("");
+    expect(answer.error).toMatch(/500|internal/i);
+    expect(fetchImpl.requests).toHaveLength(1);
+  });
+
   it("returns an error answer when Gemini blocks the prompt", async () => {
     const fetchImpl = fakeFetch(() => jsonResponse({ promptFeedback: { blockReason: "SAFETY" }, modelVersion: "gemini-2.5-flash" }));
     const answer = await askGemini(KEY, "What is evoix.io?", { fetch: fetchImpl, timeoutMs: 5000 });

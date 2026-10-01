@@ -8,6 +8,10 @@ import Script from "next/script";
  * documented, with one `init` and one `PageView`, plus the noscript image
  * fallback. No other events are sent anywhere in the app.
  *
+ * Rendered by the marketing pages only (/ and /thanks), never by the root
+ * layout: a PageView carries the page URL, and /activate and /app must not
+ * send theirs to a third party (review fix, 2026-10-01).
+ *
  * Snippet source: https://developers.facebook.com/docs/meta-pixel/get-started
  * (fetched 2026-10-01; the script block and the noscript img match the page,
  * with the pixel id substituted).

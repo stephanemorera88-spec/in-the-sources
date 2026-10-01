@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ProjectInput } from "../../contracts";
 import { SUGGEST_COUNT, SUGGEST_SYSTEM_PROMPT, buildSuggestPrompt, parseSuggestions, suggestPrompts } from "../suggest";
+import { fakeFetch, jsonResponse } from "./helpers";
 
 const project: ProjectInput = {
   brandName: "In the Sources",
@@ -80,6 +81,27 @@ describe("suggestPrompts", () => {
     const stubborn = vi.fn().mockResolvedValue("still garbage");
     await expect(suggestPrompts({ openai: "o" }, project, "", { complete: stubborn })).rejects.toThrow(/two attempts/);
     expect(stubborn).toHaveBeenCalledTimes(2);
+  });
+
+  it("makes one request per engine call and never lets an SDK retry a failure", async () => {
+    // A retried timeout would double the model time against the route budget (maxDuration 120).
+    const openai = fakeFetch(() => jsonResponse({ error: { message: "overloaded", type: "server_error", code: null } }, 500));
+    await expect(suggestPrompts({ openai: "sk-test-key-abcdef123456" }, project, "", { fetch: openai })).rejects.toThrow(
+      /Could not get suggestions from openai/
+    );
+    expect(openai.requests).toHaveLength(1);
+
+    const anthropic = fakeFetch(() => jsonResponse({ type: "error", error: { type: "api_error", message: "overloaded" } }, 500));
+    await expect(suggestPrompts({ anthropic: "sk-ant-test-key-abcdef123456" }, project, "", { fetch: anthropic })).rejects.toThrow(
+      /Could not get suggestions from anthropic/
+    );
+    expect(anthropic.requests).toHaveLength(1);
+
+    const gemini = fakeFetch(() => jsonResponse({ error: { code: 500, message: "internal", status: "INTERNAL" } }, 500));
+    await expect(suggestPrompts({ gemini: "AIzaSyTestKeyAbcdef1234567890" }, project, "", { fetch: gemini })).rejects.toThrow(
+      /Could not get suggestions from gemini/
+    );
+    expect(gemini.requests).toHaveLength(1);
   });
 
   it("wraps an engine failure in a plain message without the key", async () => {

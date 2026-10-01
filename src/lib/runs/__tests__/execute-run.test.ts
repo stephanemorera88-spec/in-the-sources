@@ -16,6 +16,7 @@ vi.mock("../../engines", () => ({
 
 import * as db from "../../db";
 import { runProjectPrompts } from "../../engines";
+import { RUN_BUDGET_MS } from "../../engines/models";
 import { executeRun } from "../index";
 
 const project: Project = {
@@ -104,6 +105,17 @@ describe("executeRun", () => {
     expect(mocked.getRun).toHaveBeenCalledWith("l1", "p1", "r1");
     expect(result.status).toBe("complete");
     expect(result.id).toBe("r1");
+  });
+
+  it("gives every run a deadline: the caller's, or RUN_BUDGET_MS from now", async () => {
+    const before = Date.now();
+    await executeRun("l1", "p1", "manual");
+    const own = mocked.runProjectPrompts.mock.calls[0]?.[0]?.deadline;
+    expect(own).toBeGreaterThanOrEqual(before + RUN_BUDGET_MS);
+    expect(own).toBeLessThanOrEqual(Date.now() + RUN_BUDGET_MS);
+
+    await executeRun("l1", "p1", "cron", { deadline: 1_234_567 });
+    expect(mocked.runProjectPrompts.mock.calls[1]?.[0]?.deadline).toBe(1_234_567);
   });
 
   it("marks partial when some calls failed and failed when all did", async () => {

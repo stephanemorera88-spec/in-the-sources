@@ -1,5 +1,6 @@
 import "../server-only";
 import { Resend } from "resend";
+import { activatePath } from "../activate-link";
 import { PRODUCT } from "../product";
 
 /*
@@ -13,9 +14,10 @@ import { PRODUCT } from "../product";
 
 const DEFAULT_FROM = `${PRODUCT.name} <noreply@evoix.io>`;
 
+/** `${NEXT_PUBLIC_BASE_URL}/activate#k=${key}`. The key sits in the fragment so it never reaches a server log or a third-party script (review fix, 2026-10-01). */
 export function activateUrl(key: string): string {
   const base = (process.env.NEXT_PUBLIC_BASE_URL?.trim() || "http://localhost:3000").replace(/\/+$/, "");
-  return `${base}/activate?k=${encodeURIComponent(key)}`;
+  return `${base}${activatePath(key)}`;
 }
 
 function escapeHtml(value: string): string {
@@ -53,7 +55,7 @@ export function licenseKeyEmailBody(params: { to: string; key: string }): { subj
   return { subject, html, text };
 }
 
-/** Resend, from EMAIL_FROM, link to `${NEXT_PUBLIC_BASE_URL}/activate?k=${key}`. */
+/** Resend, from EMAIL_FROM, link from activateUrl (key in the fragment). */
 export async function sendLicenseKeyEmail(params: { to: string; key: string }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) throw new Error("RESEND_API_KEY is not set; the license email cannot be sent.");

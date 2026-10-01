@@ -14,14 +14,16 @@ import { askAnthropic } from "./anthropic";
 import { describeError, failedAnswer, type EngineOpts } from "./common";
 import { askGemini } from "./gemini";
 import { createLimiter } from "./limiter";
-import { RUN_CONCURRENCY } from "./models";
+import { MIN_CALL_BUDGET_MS, QUERY_TIMEOUT_MS, RUN_CONCURRENCY } from "./models";
 import { askOpenAI } from "./openai";
 
 export {
   ANTHROPIC_MODEL,
   GEMINI_MODEL,
+  MIN_CALL_BUDGET_MS,
   OPENAI_MODEL,
   QUERY_TIMEOUT_MS,
+  RUN_BUDGET_MS,
   RUN_CONCURRENCY,
   SYSTEM_PROMPT,
 } from "./models";
@@ -56,12 +58,23 @@ const EMPTY_ANALYSIS: AnswerAnalysis = { mentioned: false, position: null, cited
 
 export type AskFn = (engine: EngineId, apiKey: string, prompt: string, opts?: EngineOpts) => Promise<EngineAnswer>;
 
+/** Error text of a result row written when the run's deadline left no room for the call. */
+export const RUN_BUDGET_EXHAUSTED = "Run budget exhausted before this call started.";
+
 export async function runProjectPrompts(params: {
   keys: EngineKeys;
   project: Project;
   prompts: Prompt[];
   onResult: (r: ResultInput) => Promise<void>;
   concurrency?: number;
+  /**
+   * Absolute time (Date.now() ms) by which the run must be over. A call that
+   * cannot start with at least MIN_CALL_BUDGET_MS left is written as an
+   * errored row (RUN_BUDGET_EXHAUSTED) without touching the engine; a call
+   * that does start gets a timeout capped at what remains. Unset means the
+   * plain per-call timeout.
+   */
+  deadline?: number;
   /** Test seam: replaces askEngine. */
   ask?: AskFn;
 }): Promise<{ total: number; errored: number }> {
@@ -80,14 +93,19 @@ export async function runProjectPrompts(params: {
     tasks.map((task) =>
       limit(async () => {
         const apiKey = (params.keys[task.engine] ?? "").trim();
+        const remaining = params.deadline === undefined ? QUERY_TIMEOUT_MS : params.deadline - Date.now();
+        const skipped = remaining < MIN_CALL_BUDGET_MS;
         let answer: EngineAnswer;
-        let analysis: AnswerAnalysis;
-        try {
-          answer = await ask(task.engine, apiKey, task.prompt.text);
-          analysis = answer.error ? EMPTY_ANALYSIS : analyzeAnswer(answer, params.project);
-        } catch (err) {
-          answer = failedAnswer(task.engine, "", 0, describeError(err, apiKey));
-          analysis = EMPTY_ANALYSIS;
+        let analysis: AnswerAnalysis = EMPTY_ANALYSIS;
+        if (skipped) {
+          answer = failedAnswer(task.engine, "", 0, RUN_BUDGET_EXHAUSTED);
+        } else {
+          try {
+            answer = await ask(task.engine, apiKey, task.prompt.text, { timeoutMs: Math.min(QUERY_TIMEOUT_MS, remaining) });
+            analysis = answer.error ? EMPTY_ANALYSIS : analyzeAnswer(answer, params.project);
+          } catch (err) {
+            answer = failedAnswer(task.engine, "", 0, describeError(err, apiKey));
+          }
         }
         const result: ResultInput = {
           promptId: task.prompt.id,
@@ -101,7 +119,7 @@ export async function runProjectPrompts(params: {
           competitorDomainsCited: analysis.competitorDomainsCited,
           rawText: answer.text,
           error: answer.error,
-          latencyMs: Number.isFinite(answer.latencyMs) ? Math.round(answer.latencyMs) : null,
+          latencyMs: !skipped && Number.isFinite(answer.latencyMs) ? Math.round(answer.latencyMs) : null,
         };
         let failed = answer.error !== null;
         try {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Button, PageShell } from "@/components/ui";
+import { MetaPixel } from "@/components/MetaPixel";
 import { SUPPORT_MAILTO, SiteFooter, SiteHeader } from "@/components/marketing";
 import { PRODUCT } from "@/lib/product";
 
@@ -30,6 +31,7 @@ export default function ThanksPage() {
 
   return (
     <>
+      <MetaPixel />
       <SiteHeader />
 
       <main>

@@ -493,6 +493,32 @@ export async function finishRun(runId: string, status: RunStatus): Promise<void>
   await getDb().query(`UPDATE runs SET status = $2, finished_at = NOW() WHERE id = $1`, [runId, status]);
 }
 
+/** A run still "running" this long after it started was killed with its function; no run lives past RUN_BUDGET_MS. */
+export const STALE_RUN_MINUTES = 15;
+
+/**
+ * Closes runs left at "running" longer than `olderThanMinutes` (the function
+ * died before finishRun): "partial" when the run has at least one answered
+ * row, "failed" otherwise, finished_at set now. Returns how many were closed.
+ * Maintenance for the cron, not license-scoped on purpose: it writes status
+ * and finished_at only and returns a count, never a row.
+ */
+export async function sweepStaleRuns(olderThanMinutes = STALE_RUN_MINUTES): Promise<number> {
+  const minutes = Math.max(1, Math.floor(olderThanMinutes));
+  const { rows } = await getDb().query(
+    `UPDATE runs
+     SET status = CASE
+           WHEN EXISTS (SELECT 1 FROM results res WHERE res.run_id = runs.id AND res.error IS NULL) THEN 'partial'
+           ELSE 'failed'
+         END,
+         finished_at = NOW()
+     WHERE status = 'running' AND started_at < NOW() - ($1::int * INTERVAL '1 minute')
+     RETURNING id`,
+    [minutes]
+  );
+  return rows.length;
+}
+
 export async function listRuns(licenseId: string, projectId: string, limit = 30): Promise<Run[]> {
   const n = Math.max(1, Math.min(500, Math.floor(limit)));
   const { rows } = await getDb().query(
@@ -565,19 +591,22 @@ function rate(numerator: number, answered: number): number | null {
   return answered === 0 ? null : numerator / answered;
 }
 
-/** Per-engine and overall counts for one run. Errored rows are excluded from `answered`. */
+/** Per-engine and overall counts for one run. `attempted` counts every row for the engine; errored rows are excluded from `answered`. */
 function summarizeRun(run: { id: string; startedAt: string; status: RunStatus }, rows: DashboardResultRow[]): RunSummary {
   const perEngine: EngineRate[] = ENGINES.map((engine) => {
+    let attempted = 0;
     let answered = 0;
     let mentioned = 0;
     let cited = 0;
     for (const r of rows) {
-      if (r.engine !== engine || r.error !== null) continue;
+      if (r.engine !== engine) continue;
+      attempted += 1;
+      if (r.error !== null) continue;
       answered += 1;
       if (r.mentioned) mentioned += 1;
       if (r.cited) cited += 1;
     }
-    return { engine, answered, mentioned, cited, mentionRate: rate(mentioned, answered), citationRate: rate(cited, answered) };
+    return { engine, attempted, answered, mentioned, cited, mentionRate: rate(mentioned, answered), citationRate: rate(cited, answered) };
   });
   const overall = perEngine.reduce(
     (acc, e) => ({ answered: acc.answered + e.answered, mentioned: acc.mentioned + e.mentioned, cited: acc.cited + e.cited }),

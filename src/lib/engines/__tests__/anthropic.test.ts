@@ -116,9 +116,19 @@ describe("askAnthropic", () => {
     expect(answer.error).not.toContain(KEY);
   });
 
-  it("returns an error answer when the request times out", async () => {
-    const answer = await askAnthropic(KEY, "What is evoix.io?", { fetch: hangingFetch(), timeoutMs: 30 });
+  it("returns an error answer when the request times out, after one attempt", async () => {
+    const fetchImpl = hangingFetch();
+    const answer = await askAnthropic(KEY, "What is evoix.io?", { fetch: fetchImpl, timeoutMs: 30 });
     expect(answer.text).toBe("");
     expect(answer.error).toMatch(/timed out|timeout|abort/i);
+    // The SDK would retry a timeout while retries remain; one timeout must cost one timeout of the run budget.
+    expect(fetchImpl.requests).toHaveLength(1);
+  });
+
+  it("does not retry a server error", async () => {
+    const fetchImpl = fakeFetch(() => jsonResponse({ type: "error", error: { type: "api_error", message: "overloaded" } }, 500));
+    const answer = await askAnthropic(KEY, "What is evoix.io?", { fetch: fetchImpl, timeoutMs: 5000 });
+    expect(answer.error).toMatch(/500/);
+    expect(fetchImpl.requests).toHaveLength(1);
   });
 });

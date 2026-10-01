@@ -29,6 +29,7 @@ import {
   listRuns,
   normalizeDomain,
   setEngineKey,
+  sweepStaleRuns,
   updateProject,
 } from "./index";
 import { TEST_KEY_ENCRYPTION_SECRET, createTestDb } from "./test-db";
@@ -397,17 +398,19 @@ describe("getDashboard", () => {
 
     const byEngine = Object.fromEntries(dash.latestRun!.perEngine.map((e) => [e.engine, e]));
     expect(dash.latestRun!.perEngine.map((e) => e.engine)).toEqual(["openai", "anthropic", "gemini"]);
-    expect(byEngine.openai).toEqual({ engine: "openai", answered: 2, mentioned: 1, cited: 2, mentionRate: 0.5, citationRate: 1 });
-    expect(byEngine.anthropic).toEqual({ engine: "anthropic", answered: 1, mentioned: 1, cited: 0, mentionRate: 1, citationRate: 0 });
-    expect(byEngine.gemini).toEqual({ engine: "gemini", answered: 1, mentioned: 1, cited: 0, mentionRate: 1, citationRate: 0 });
+    // attempted counts every row, errored ones included; answered leaves the errored rows out.
+    expect(byEngine.openai).toEqual({ engine: "openai", attempted: 2, answered: 2, mentioned: 1, cited: 2, mentionRate: 0.5, citationRate: 1 });
+    expect(byEngine.anthropic).toEqual({ engine: "anthropic", attempted: 2, answered: 1, mentioned: 1, cited: 0, mentionRate: 1, citationRate: 0 });
+    expect(byEngine.gemini).toEqual({ engine: "gemini", attempted: 2, answered: 1, mentioned: 1, cited: 0, mentionRate: 1, citationRate: 0 });
     expect(dash.latestRun!.overall).toEqual({ answered: 4, mentioned: 3, cited: 2 });
 
     // Older run: one answered row, nothing mentioned; engines without rows have null rates.
     const olderSummary = dash.trend[0];
     expect(olderSummary.overall).toEqual({ answered: 1, mentioned: 0, cited: 0 });
     expect(olderSummary.perEngine.find((e) => e.engine === "anthropic")).toEqual({
-      engine: "anthropic", answered: 0, mentioned: 0, cited: 0, mentionRate: null, citationRate: null,
+      engine: "anthropic", attempted: 0, answered: 0, mentioned: 0, cited: 0, mentionRate: null, citationRate: null,
     });
+    expect(olderSummary.perEngine.find((e) => e.engine === "openai")?.attempted).toBe(1);
     expect(olderSummary.perEngine.find((e) => e.engine === "openai")?.mentionRate).toBe(0);
 
     expect(dash.promptTable).toEqual([
@@ -462,5 +465,51 @@ describe("getDashboard", () => {
     expect(dash?.trend[29].runId).toBe(last);
     expect(dash?.trend[0].runId).toBe(runIds[2]);
     expect(dash?.competitorLeaderboard).toHaveLength(20);
+  });
+});
+
+describe("sweepStaleRuns", () => {
+  it("closes runs stuck at running past the window, partial with an answer and failed without, and leaves the rest alone", async () => {
+    const { license } = await createLicense({ email: "sweep@example.com", plan: "dev" });
+    const project = await createProject(license.id, { brandName: "Sweep", domain: "sweep.com", aliases: [], competitorDomains: [] });
+    const [p] = await addPrompts(license.id, project.id, ["q"]);
+
+    const withAnswer = await createRun(license.id, project.id, "cron");
+    await insertResult(withAnswer.id, result({ promptId: p.id, engine: "openai", cited: true }));
+    await insertResult(withAnswer.id, result({ promptId: p.id, engine: "anthropic", error: "boom", rawText: "" }));
+    const bare = await createRun(license.id, project.id, "manual");
+    const onlyErrors = await createRun(license.id, project.id, "manual");
+    await insertResult(onlyErrors.id, result({ promptId: p.id, engine: "gemini", error: "boom", rawText: "" }));
+    const fresh = await createRun(license.id, project.id, "manual");
+    const done = await createRun(license.id, project.id, "cron");
+    await finishRun(done.id, "complete");
+    for (const id of [withAnswer.id, bare.id, onlyErrors.id, done.id]) {
+      await db.query("UPDATE runs SET started_at = NOW() - INTERVAL '20 minutes' WHERE id = $1", [id]);
+    }
+    await db.query("UPDATE runs SET started_at = NOW() - INTERVAL '5 minutes' WHERE id = $1", [fresh.id]);
+
+    expect(await sweepStaleRuns(15)).toBe(3);
+
+    const after = Object.fromEntries((await listRuns(license.id, project.id)).map((r) => [r.id, r]));
+    expect(after[withAnswer.id].status).toBe("partial");
+    expect(after[withAnswer.id].finishedAt).not.toBeNull();
+    expect(after[bare.id].status).toBe("failed");
+    expect(after[bare.id].finishedAt).not.toBeNull();
+    expect(after[onlyErrors.id].status).toBe("failed");
+    expect(after[fresh.id].status).toBe("running");
+    expect(after[fresh.id].finishedAt).toBeNull();
+    expect(after[done.id].status).toBe("complete");
+
+    // Idempotent, and the default window is the 15 minutes used above.
+    expect(await sweepStaleRuns()).toBe(0);
+  });
+});
+
+describe("schema", () => {
+  it("indexes results by run and by prompt, so the prompts cascade never scans the table", async () => {
+    const { rows } = await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename = 'results'");
+    const names = rows.map((r) => r.indexname);
+    expect(names).toContain("results_run_idx");
+    expect(names).toContain("results_prompt_idx");
   });
 });

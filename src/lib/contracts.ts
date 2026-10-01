@@ -112,6 +112,8 @@ export interface EngineKeyHint {
 
 export interface EngineRate {
   engine: EngineId;
+  /** Result rows for this engine in the run, errored or not. 0 means the engine had no key when the run started. Added 2026-10-01 (review fix). */
+  attempted: number;
   answered: number;
   mentioned: number;
   cited: number;

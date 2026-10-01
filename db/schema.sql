@@ -67,3 +67,5 @@ CREATE TABLE IF NOT EXISTS results (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS results_run_idx ON results(run_id);
+-- The prompts -> results cascade (deleteProject, archive never deletes) runs one DELETE per prompt row; without this it scans results.
+CREATE INDEX IF NOT EXISTS results_prompt_idx ON results(prompt_id);

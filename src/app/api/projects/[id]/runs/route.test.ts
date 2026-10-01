@@ -17,6 +17,7 @@ vi.mock("@/lib/license", async () => (await import("../../../_lib/test-support")
 vi.mock("@/lib/db", () => db);
 vi.mock("@/lib/runs", () => runs);
 
+import { QUERY_TIMEOUT_MS, RUN_BUDGET_MS } from "@/lib/engines/models";
 import { GET, POST, maxDuration } from "./route";
 
 const project: Project = {
@@ -53,8 +54,11 @@ beforeEach(() => {
 });
 
 describe("POST /api/projects/[id]/runs", () => {
-  it("declares a 300 second budget", () => {
+  it("declares a 300 second budget with room for the run deadline and the closing writes", () => {
     expect(maxDuration).toBe(300);
+    // executeRun ends every call by RUN_BUDGET_MS; the margin covers finishRun and the response.
+    expect(RUN_BUDGET_MS + 30_000).toBeLessThanOrEqual(maxDuration * 1000);
+    expect(QUERY_TIMEOUT_MS).toBeLessThan(RUN_BUDGET_MS);
   });
 
   it("starts a manual run for the license and project and returns the finished run", async () => {

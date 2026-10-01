@@ -1,7 +1,8 @@
 import "@/lib/server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { listProjectsForDailyRun } from "@/lib/db";
+import { listProjectsForDailyRun, sweepStaleRuns } from "@/lib/db";
+import { RUN_BUDGET_MS } from "@/lib/engines/models";
 import { executeRun } from "@/lib/runs";
 
 /*
@@ -10,11 +11,13 @@ import { executeRun } from "@/lib/runs";
  * `Authorization: Bearer ${CRON_SECRET}` to the request.
  *
  * Flow: 500 when CRON_SECRET is unset (nothing could ever authenticate), 401
- * on a missing or wrong bearer (constant-time compare), then every project
- * from listProjectsForDailyRun runs sequentially through executeRun(...,
- * "cron") until the 240 s wall budget is spent. Each run is wrapped in
+ * on a missing or wrong bearer (constant-time compare), a sweep that closes
+ * runs left at "running" by a killed function, then every project from
+ * listProjectsForDailyRun runs sequentially through executeRun(..., "cron")
+ * until the 240 s wall budget is spent. Each run gets the remaining budget
+ * as its deadline, so no run outlives this function. Each run is wrapped in
  * try/catch so one bad project never stops the rest. The JSON report counts
- * started, finished and skipped projects and lists errors.
+ * started, finished, skipped and swept runs and lists errors.
  *
  * Only route exports live here (GET, maxDuration): Next's route type check
  * rejects any other value export from a route file.
@@ -23,13 +26,14 @@ import { executeRun } from "@/lib/runs";
 /** Seconds. Vercel kills the function at this point, so the loop stops starting runs 60 s earlier. */
 export const maxDuration = 300;
 
-/** Wall budget for the sequential loop, in ms, measured with Date.now(). */
-const RUN_BUDGET_MS = 240_000;
+/* The loop's wall budget is RUN_BUDGET_MS (src/lib/engines/models.ts, 240 s), measured with Date.now(). */
 
 interface DailyCronReport {
   started: number;
   finished: number;
   skipped: number;
+  /** Runs older than STALE_RUN_MINUTES still marked running, closed at the start of this call. */
+  swept: number;
   errors: string[];
 }
 
@@ -56,6 +60,14 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   const deadline = Date.now() + RUN_BUDGET_MS;
+  const report: DailyCronReport = { started: 0, finished: 0, skipped: 0, swept: 0, errors: [] };
+
+  // A run killed with its function yesterday would otherwise stay "running" forever.
+  try {
+    report.swept = await sweepStaleRuns();
+  } catch (err) {
+    report.errors.push(`sweep: ${errorMessage(err)}`);
+  }
 
   let projects: Array<{ licenseId: string; projectId: string }>;
   try {
@@ -64,8 +76,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: `listProjectsForDailyRun failed: ${errorMessage(err)}` }, { status: 500 });
   }
 
-  const report: DailyCronReport = { started: 0, finished: 0, skipped: 0, errors: [] };
-
   for (const { licenseId, projectId } of projects) {
     if (Date.now() >= deadline) {
       report.skipped += 1;
@@ -73,7 +83,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     report.started += 1;
     try {
-      const run = await executeRun(licenseId, projectId, "cron");
+      const run = await executeRun(licenseId, projectId, "cron", { deadline });
       report.finished += 1;
       // executeRun resolves with a failed run instead of throwing once the run row exists.
       if (run.status === "failed") {

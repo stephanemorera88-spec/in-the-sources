@@ -2,15 +2,26 @@ import "../server-only";
 import { ENGINES, type Run, type RunStatus } from "../contracts";
 import { createRun, finishRun, getEngineKeys, getProject, getRun, insertResult, listPrompts } from "../db";
 import { runProjectPrompts } from "../engines";
+import { RUN_BUDGET_MS } from "../engines/models";
 
 /*
  * Run orchestration (builder A). Everything that can refuse a run happens
  * before the run row exists (unknown project, no keys, no prompts). Once
  * createRun has returned, nothing throws: the run ends "complete",
  * "partial" or "failed" and the final row is returned.
+ *
+ * Every run has a deadline (review fix, 2026-10-01): the caller's, or
+ * RUN_BUDGET_MS from now. Calls that cannot start before it become errored
+ * rows, so the run closes inside the route's maxDuration instead of being
+ * killed with its row left at "running".
  */
 
-export async function executeRun(licenseId: string, projectId: string, trigger: "manual" | "cron"): Promise<Run> {
+export async function executeRun(
+  licenseId: string,
+  projectId: string,
+  trigger: "manual" | "cron",
+  opts: { deadline?: number } = {}
+): Promise<Run> {
   const project = await getProject(licenseId, projectId);
   if (!project) throw new Error("project not found");
 
@@ -21,6 +32,7 @@ export async function executeRun(licenseId: string, projectId: string, trigger: 
   if (prompts.length === 0) throw new Error("Add at least one prompt before running this project.");
 
   const run = await createRun(licenseId, projectId, trigger);
+  const deadline = opts.deadline ?? Date.now() + RUN_BUDGET_MS;
 
   let status: RunStatus = "failed";
   try {
@@ -28,6 +40,7 @@ export async function executeRun(licenseId: string, projectId: string, trigger: 
       keys,
       project,
       prompts,
+      deadline,
       onResult: (result) => insertResult(run.id, result),
     });
     status = errored === 0 ? "complete" : errored < total ? "partial" : "failed";

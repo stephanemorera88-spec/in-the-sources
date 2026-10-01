@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import { Button, PageShell } from "@/components/ui";
+import { MetaPixel } from "@/components/MetaPixel";
 import {
   BuyButton,
   DefinitionList,
@@ -130,6 +131,7 @@ export default function LandingPage() {
 
   return (
     <>
+      <MetaPixel />
       <SiteHeader />
 
       <main>

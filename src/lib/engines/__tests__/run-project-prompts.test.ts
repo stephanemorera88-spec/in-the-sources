@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EngineAnswer, EngineId, Project, Prompt, ResultInput } from "../../contracts";
-import { askEngine, runProjectPrompts, type AskFn } from "../index";
+import { RUN_BUDGET_EXHAUSTED, askEngine, runProjectPrompts, type AskFn } from "../index";
+import { MIN_CALL_BUDGET_MS, QUERY_TIMEOUT_MS } from "../models";
 import { tick } from "./helpers";
 
 const project: Project = {
@@ -164,6 +165,85 @@ describe("runProjectPrompts", () => {
     await expect(
       runProjectPrompts({ keys: { openai: "k" }, project, prompts: [], onResult: async () => {}, ask: async (e) => good(e) })
     ).resolves.toEqual({ total: 0, errored: 0 });
+  });
+});
+
+describe("runProjectPrompts deadline", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("writes every remaining call as an errored row once the deadline has passed, without touching the engine", async () => {
+    const ask = vi.fn<AskFn>(async (engine) => good(engine));
+    const results: ResultInput[] = [];
+    const outcome = await runProjectPrompts({
+      keys: { openai: "k", anthropic: "k" },
+      project,
+      prompts,
+      deadline: Date.now() - 1,
+      onResult: async (r) => {
+        results.push(r);
+      },
+      ask,
+    });
+    expect(ask).not.toHaveBeenCalled();
+    expect(outcome).toEqual({ total: 4, errored: 4 });
+    expect(results).toHaveLength(4);
+    for (const r of results) {
+      expect(r.error).toBe(RUN_BUDGET_EXHAUSTED);
+      expect(r.rawText).toBe("");
+      expect(r.model).toBeNull();
+      expect(r.latencyMs).toBeNull();
+      expect(r.mentioned).toBe(false);
+      expect(r.cited).toBe(false);
+    }
+  });
+
+  it("caps each call's timeout at what is left of the budget, and uses the plain timeout without a deadline", async () => {
+    const timeouts: Array<number | undefined> = [];
+    const ask: AskFn = async (engine, _apiKey, _prompt, opts) => {
+      timeouts.push(opts?.timeoutMs);
+      return good(engine);
+    };
+    await runProjectPrompts({
+      keys: { openai: "k" },
+      project,
+      prompts: prompts.slice(0, 1),
+      deadline: Date.now() + 20_000,
+      onResult: async () => {},
+      ask,
+    });
+    expect(timeouts).toHaveLength(1);
+    expect(timeouts[0]).toBeGreaterThanOrEqual(MIN_CALL_BUDGET_MS);
+    expect(timeouts[0]).toBeLessThanOrEqual(20_000);
+    expect(timeouts[0]).toBeLessThan(QUERY_TIMEOUT_MS);
+
+    timeouts.length = 0;
+    await runProjectPrompts({ keys: { openai: "k" }, project, prompts: prompts.slice(0, 1), onResult: async () => {}, ask });
+    expect(timeouts).toEqual([QUERY_TIMEOUT_MS]);
+  });
+
+  it("keeps the answers of calls that started and errors the rest when the budget runs out mid-run", async () => {
+    let clock = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    // The first call eats the whole budget; with one call in flight the second one finds nothing left.
+    const ask: AskFn = async (engine) => {
+      clock += 100_000;
+      return good(engine);
+    };
+    const results: ResultInput[] = [];
+    const outcome = await runProjectPrompts({
+      keys: { openai: "k" },
+      project,
+      prompts,
+      concurrency: 1,
+      deadline: clock + 60_000,
+      onResult: async (r) => {
+        results.push(r);
+      },
+      ask,
+    });
+    expect(outcome).toEqual({ total: 2, errored: 1 });
+    expect(results.map((r) => r.error)).toEqual([null, RUN_BUDGET_EXHAUSTED]);
+    expect(results[0]?.cited).toBe(true);
   });
 });
 

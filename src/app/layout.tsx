@@ -3,7 +3,11 @@ import type React from "react";
 import { Geist_Mono, Schibsted_Grotesk, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import { PRODUCT } from "@/lib/product";
-import { MetaPixel } from "@/components/MetaPixel";
+
+/* No analytics here. The Meta pixel is rendered by the marketing pages only
+   (src/app/page.tsx, src/app/thanks/page.tsx): a root-layout pixel would also
+   fire on /activate and /app, where a PageView carries the page URL to a
+   third party (review fix, 2026-10-01). */
 
 /* Option types: node_modules/next/dist/compiled/@next/font/dist/google/index.d.ts
    (Source_Serif_4 line 17114, Schibsted_Grotesk line 16361, Geist_Mono line 5674).
@@ -51,7 +55,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={`${serifDisplay.variable} ${sansBody.variable} ${geistMono.variable} antialiased`}>
-        <MetaPixel />
         {children}
       </body>
     </html>

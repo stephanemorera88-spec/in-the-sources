@@ -60,7 +60,9 @@ export async function askAnthropic(apiKey: string, prompt: string, opts: EngineO
   try {
     // BYOK: client built per call with the user's key; process.env is never read.
     // ClientOptions: node_modules/@anthropic-ai/sdk/client.d.ts lines 42 (apiKey), 126 (maxRetries), 108 (fetch, test seam).
-    const client = new Anthropic({ apiKey, maxRetries: 1, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
+    // maxRetries 0: the SDK retries a timed-out connection while retries remain (client.js lines 552-560),
+    // which would make one hanging call cost two timeouts against the run budget (review fix, 2026-10-01).
+    const client = new Anthropic({ apiKey, maxRetries: 0, ...(opts.fetch ? { fetch: opts.fetch } : {}) });
     const message = await client.messages.create(
       {
         model: ANTHROPIC_MODEL, // messages.d.ts line 3582

@@ -26,7 +26,16 @@ describe("license key email", () => {
   });
 
   it("builds the activate link from NEXT_PUBLIC_BASE_URL without a double slash", () => {
-    expect(activateUrl(KEY)).toBe(`https://inthesources.evoix.io/activate?k=${KEY}`);
+    expect(activateUrl(KEY)).toBe(`https://inthesources.evoix.io/activate#k=${KEY}`);
+  });
+
+  it("carries the key in the URL fragment only, never in the query string", () => {
+    // A fragment is not sent to the server, so the key stays out of request logs and off any analytics script.
+    const url = new URL(activateUrl(KEY));
+    expect(url.pathname).toBe("/activate");
+    expect(url.search).toBe("");
+    expect(url.hash).toBe(`#k=${KEY}`);
+    expect(activateUrl(KEY)).not.toContain("?");
   });
 
   it("has the subject, the key in a monospace block, the link and the lifetime line, with no em dash or rhetorical colon", () => {
@@ -34,10 +43,10 @@ describe("license key email", () => {
     expect(subject).toBe("Your In the Sources license key");
     expect(html).toContain(`<pre style="font-family: 'Geist Mono'`);
     expect(html).toContain(KEY);
-    expect(html).toContain(`href="https://inthesources.evoix.io/activate?k=${KEY}"`);
+    expect(html).toContain(`href="https://inthesources.evoix.io/activate#k=${KEY}"`);
     expect(html).toContain("lifetime license tied to buyer@example.com");
     expect(text).toContain(KEY);
-    expect(text).toContain(`https://inthesources.evoix.io/activate?k=${KEY}`);
+    expect(text).toContain(`https://inthesources.evoix.io/activate#k=${KEY}`);
     expect(text).toContain("lifetime license tied to buyer@example.com");
     for (const body of [subject, html, text]) {
       expect(body).not.toContain("—");

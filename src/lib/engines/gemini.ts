@@ -91,8 +91,9 @@ export async function askGemini(apiKey: string, prompt: string, opts: EngineOpts
         httpOptions: {
           // .httpOptions line 6102; HttpOptions.timeout (milliseconds) line 8438
           timeout,
-          // HttpRetryOptions.attempts line 8515 counts the first try; the SDK default is 5
-          retryOptions: { attempts: 2 },
+          // HttpRetryOptions.attempts (genai.d.ts line 8515) counts the first try, "0 or 1 means no retries";
+          // the SDK default is 5. One attempt, so a slow call costs one timeout against the run budget.
+          retryOptions: { attempts: 1 },
           // HttpOptions.fetch line 8447, test seam
           ...(opts.fetch ? { fetch: opts.fetch } : {}),
         },

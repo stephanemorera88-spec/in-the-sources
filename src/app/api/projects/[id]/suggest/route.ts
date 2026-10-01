@@ -3,8 +3,13 @@ import { getEngineKeys, getProject } from "@/lib/db";
 import { fetchSiteText, suggestPrompts } from "@/lib/engines";
 import { errorMessage, json, jsonError, jsonNotFound, scrubSecrets, withLicense } from "../../../_lib/with-license";
 
-/* Reading the site plus one model call; Vercel's default budget is shorter than that on some plans. */
-export const maxDuration = 60;
+/*
+ * Budget: the site read is capped at SITE_FETCH_TIMEOUT_MS (10 s, every hop
+ * included) and suggestPrompts makes at most two model attempts of
+ * SUGGEST_TIMEOUT_MS (30 s, no SDK retries), 70 s worst case. The route test
+ * pins this arithmetic (review fix, 2026-10-01).
+ */
+export const maxDuration = 120;
 
 type Params = { id: string };
 
