@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="sd-title sd-desc">
+  <title id="sd-title">Sample dashboard, one project on three engines</title>
+  <desc id="sd-desc">Mock readout. Source-set inclusion and mention rates for ChatGPT, Claude and Gemini on a sample project, a trend across runs, and a prompt table.</desc>
+  <style>
+    .serif { font-family: "Source Serif 4", Georgia, "Times New Roman", serif; font-weight: 500; letter-spacing: -0.02em; fill: #111110; }
+    .sans { font-family: "Schibsted Grotesk", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; fill: #111110; }
+    .mono { font-family: "Geist Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 14px; fill: #4a4946; }
+    .label { font-family: "Schibsted Grotesk", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0.06em; fill: #6f6d68; }
+    .muted { fill: #6f6d68; }
+    .hair { stroke: rgba(17,17,16,0.10); stroke-width: 1; }
+    .hair-strong { stroke: rgba(17,17,16,0.32); stroke-width: 1; }
+    .trend { fill: none; stroke: #111110; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .dot-on { fill: #111110; }
+    .dot-ring { fill: none; stroke: #111110; stroke-width: 1.5; }
+    .dot-off { fill: rgba(17,17,16,0.25); }
+  </style>
+
+  <rect width="1200" height="720" fill="#ffffff"/>
+
+  <!-- Header row -->
+  <text x="56" y="76" class="serif" font-size="28">acme-tools.com</text>
+  <text x="1144" y="74" class="sans muted" font-size="15" text-anchor="end">Latest run, Oct 1, 2026. 24 prompts on 3 engines.</text>
+  <line x1="56" y1="104" x2="1144" y2="104" class="hair"/>
+
+  <!-- Column dividers -->
+  <line x1="408" y1="124" x2="408" y2="488" class="hair"/>
+  <line x1="776" y1="124" x2="776" y2="488" class="hair"/>
+
+  <!-- Column 1: ChatGPT -->
+  <text x="56" y="146" class="label">CHATGPT</text>
+  <text x="56" y="168" class="mono">gpt-5-mini</text>
+  <text x="56" y="222" class="label">IN THE SOURCES</text>
+  <text x="56" y="286" class="serif" font-size="64">42%</text>
+  <text x="56" y="310" class="sans muted" font-size="14">10 of 24 answers cite acme-tools.com</text>
+  <text x="56" y="354" class="label">MENTIONED</text>
+  <text x="56" y="390" class="serif" font-size="32">58%</text>
+  <text x="140" y="390" class="sans muted" font-size="14">14 of 24</text>
+  <polyline class="trend" points="56,468 104,462 152,466 200,452 248,448 296,440 344,436 392,428"/>
+
+  <!-- Column 2: Claude -->
+  <text x="424" y="146" class="label">CLAUDE</text>
+  <text x="424" y="168" class="mono">claude-haiku-4-5</text>
+  <text x="424" y="222" class="label">IN THE SOURCES</text>
+  <text x="424" y="286" class="serif" font-size="64">33%</text>
+  <text x="424" y="310" class="sans muted" font-size="14">8 of 24 answers cite acme-tools.com</text>
+  <text x="424" y="354" class="label">MENTIONED</text>
+  <text x="424" y="390" class="serif" font-size="32">50%</text>
+  <text x="508" y="390" class="sans muted" font-size="14">12 of 24</text>
+  <polyline class="trend" points="424,470 472,470 520,464 568,466 616,458 664,452 712,448 760,440"/>
+
+  <!-- Column 3: Gemini -->
+  <text x="792" y="146" class="label">GEMINI</text>
+  <text x="792" y="168" class="mono">gemini-2.5-flash</text>
+  <text x="792" y="222" class="label">IN THE SOURCES</text>
+  <text x="792" y="286" class="serif" font-size="64">54%</text>
+  <text x="792" y="310" class="sans muted" font-size="14">13 of 24 answers cite acme-tools.com</text>
+  <text x="792" y="354" class="label">MENTIONED</text>
+  <text x="792" y="390" class="serif" font-size="32">63%</text>
+  <text x="876" y="390" class="sans muted" font-size="14">15 of 24</text>
+  <polyline class="trend" points="792,462 840,456 888,458 936,446 984,440 1032,430 1080,426 1128,418"/>
+
+  <!-- Prompt table -->
+  <line x1="56" y1="504" x2="1144" y2="504" class="hair"/>
+  <text x="56" y="536" class="label">PROMPT</text>
+  <text x="820" y="536" class="label" text-anchor="middle">CHATGPT</text>
+  <text x="950" y="536" class="label" text-anchor="middle">CLAUDE</text>
+  <text x="1080" y="536" class="label" text-anchor="middle">GEMINI</text>
+  <line x1="56" y1="548" x2="1144" y2="548" class="hair-strong"/>
+
+  <text x="56" y="580" class="sans" font-size="15">best project management tools for small agencies</text>
+  <circle cx="820" cy="575" r="5" class="dot-on"/>
+  <circle cx="950" cy="575" r="5" class="dot-ring"/>
+  <circle cx="1080" cy="575" r="5" class="dot-on"/>
+  <line x1="56" y1="596" x2="1144" y2="596" class="hair"/>
+
+  <text x="56" y="628" class="sans" font-size="15">easiest invoicing app for freelancers</text>
+  <circle cx="820" cy="623" r="5" class="dot-ring"/>
+  <circle cx="950" cy="623" r="2.5" class="dot-off"/>
+  <circle cx="1080" cy="623" r="5" class="dot-on"/>
+  <line x1="56" y1="644" x2="1144" y2="644" class="hair"/>
+
+  <text x="56" y="676" class="sans" font-size="15">acme tools vs harvest for time tracking</text>
+  <circle cx="820" cy="671" r="5" class="dot-on"/>
+  <circle cx="950" cy="671" r="5" class="dot-on"/>
+  <circle cx="1080" cy="671" r="5" class="dot-ring"/>
+  <line x1="56" y1="692" x2="1144" y2="692" class="hair"/>
+
+  <!-- Legend -->
+  <circle cx="61" cy="707" r="4" class="dot-on"/>
+  <text x="72" y="711" class="sans muted" font-size="12">in the sources</text>
+  <circle cx="186" cy="707" r="4" class="dot-ring"/>
+  <text x="197" y="711" class="sans muted" font-size="12">mentioned, not cited</text>
+  <circle cx="346" cy="707" r="2" class="dot-off"/>
+  <text x="356" y="711" class="sans muted" font-size="12">neither</text>
+</svg>

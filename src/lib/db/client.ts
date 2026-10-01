@@ -97,6 +97,11 @@ function createPgQueryable(connStr: string): Queryable {
       const result = await pool.query<Record<string, unknown>>(text, params as unknown[] | undefined);
       return { rows: result.rows };
     },
+    async exec(text) {
+      // A param-less Pool.query goes through the simple protocol, which
+      // accepts several statements in one string (schema.sql).
+      return pool.query(text);
+    },
   };
 }
 

@@ -2,9 +2,9 @@
 
 Bring-your-own-key AI visibility tracker, sold as a lifetime deal by EVOIX LLC. It tells you whether ChatGPT, Claude and Gemini mention your brand and cite your site when they answer the questions your customers ask.
 
-How it works: a buyer pays once through a Stripe Payment Link, a webhook mints a license key, Resend emails it, and the key goes in an httpOnly cookie. In the app the user pastes their own OpenAI, Anthropic and Gemini API keys (encrypted at rest, never sent back to the browser), creates a project (brand, domain, aliases, competitor domains), adds prompts, and runs every prompt on every engine with web search on. Per answer the app stores whether the brand was mentioned, its position in a numbered list, whether the brand's domain is in the cited sources, the full source list, the search results the engine saw, and the raw text. The dashboard leads with the citation rate and the mention rate per engine, a trend across runs, a per-prompt table and a competitor domain leaderboard. A Vercel cron runs every project daily.
+How it works. A buyer pays once through a Stripe Payment Link, a webhook mints a license key, Resend emails it, and the key goes in an httpOnly cookie. In the app the user pastes their own OpenAI, Anthropic and Gemini API keys (encrypted at rest, never sent back to the browser), creates a project (brand, domain, aliases, competitor domains), adds prompts (typed, or ten suggested from the site text), and runs every prompt on every engine that has a key, with web search on. Per answer the app stores whether the brand was mentioned, its position in a numbered list, whether the brand's domain is in the cited sources, the full source list, the search results the engine saw, and the raw text. The dashboard leads with the source-set inclusion rate and the mention rate per engine, a trend across runs, a per-prompt table and a competitor domain leaderboard. A Vercel cron runs every project daily.
 
-The full contract (types, schema, routes, ownership, design) is in `SPEC.md`.
+The full contract (types, schema, routes, ownership, design) is in `SPEC.md`; its last section records the integration decisions made when the four builders' work was merged.
 
 ## Local setup
 
@@ -20,9 +20,25 @@ npm run migrate   # applies db/schema.sql (idempotent) to DATABASE_URL, or to th
 npm run seed      # creates a dev license for SEED_EMAIL (default stephane@evoix.io) and prints the key once
 ```
 
-Both scripts load env files through `@next/env`, so a local env file (`.env.local`) works without naming it on the command line. Copy `env.example` to `.env.local` to start. The example file is named `env.example`, without the leading dot, so the local credential guard that blocks every `.env*` path leaves it readable.
+Both scripts load env files through `@next/env`, so the usual local env file (dot env dot local) works without naming it on the command line. Copy `env.example` to that file to start. The example file is named `env.example`, without the leading dot, so the local credential guard that blocks every dotted env path leaves it readable; the guard also means Claude sessions cannot write the dotted name, which is why this README spells it out.
 
-Paste the printed key at `/activate` to open the app, then add your engine API keys in `/app/settings`.
+Paste the printed key at `/activate` to open the app, then add your engine API keys in `/app/settings`. Saving a key needs `KEY_ENCRYPTION_SECRET` in the server's environment; without it the settings route answers 500 and the server log says why.
+
+One process at a time on `.pglite-data`. The seed script and the dev server each open the folder; run the seed before the server's first database request (the landing page makes none) or with the server stopped.
+
+## Scripts
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Next dev server (Turbopack). |
+| `npm run build` | Production build. Every app and API route is dynamic; `/`, `/thanks`, `/robots.txt` and `/sitemap.xml` are static. |
+| `npm start` | Serves the production build. Build and start back to back; a rebuild under a running `next start` breaks the served CSS chunk. |
+| `npm run lint` | ESLint over the tree. |
+| `npm run typecheck` | `tsc --noEmit` over the tree. If it reports duplicate identifiers in `.next/types`, delete `.next` and build again; stray `* 2.ts` copies of the generated files showed up once during integration (cause not established) and a clean build removed them. |
+| `npm test` | `vitest run`: 31 files, 215 tests, in-memory PGlite, no network. |
+| `npm run test:watch` | Vitest in watch mode. |
+| `npm run migrate` | Applies `db/schema.sql`. |
+| `npm run seed` | Mints a dev license and prints the key once. |
 
 ## Environment variables (Vercel)
 
@@ -35,20 +51,24 @@ Required:
 | `CRON_SECRET` | Any long random string (`openssl rand -hex 32`). Vercel sends it as `Authorization: Bearer` on cron calls. |
 | `RESEND_API_KEY` | Resend dashboard, API Keys. |
 | `EMAIL_FROM` | Sender address on a domain verified in Resend. Default `In the Sources <noreply@evoix.io>`. |
-| `NEXT_PUBLIC_BASE_URL` | The deployment origin, no trailing slash (for example `https://inthesources.evoix.io`). Used in the license email and in metadata. |
+| `NEXT_PUBLIC_BASE_URL` | The deployment origin, no trailing slash (for example `https://inthesources.evoix.io`). Used in the license email, metadata, robots and sitemap. |
 
 Optional:
 
 | Variable | Where the value comes from |
 |---|---|
 | `STRIPE_WEBHOOK_SECRET` | Stripe dashboard, Developers, Webhooks, after adding the endpoint `/api/stripe/webhook` for `checkout.session.completed`. Required once the Payment Link exists. |
-| `STRIPE_PAYMENT_LINK_URL` | The Payment Link URL from Stripe. Unset shows "Founder keys open soon" on the landing page. |
-| `STRIPE_FOUNDER_PRICE_ID` | The `price_...` id of the founder product. When set, a matching checkout maps to the founder plan. |
-| `NEXT_PUBLIC_META_PIXEL_ID` | Meta Events Manager. Unset renders no pixel. |
+| `STRIPE_PAYMENT_LINK_URL` | The Payment Link URL from Stripe (https only). Unset shows "Founder keys open this week" with a mailto on the landing page. The landing page is static, so changing this needs a redeploy. |
+| `STRIPE_FOUNDER_PRICE_ID` | The `price_...` id of the founder product. When set and the session carries expanded line items, a matching checkout maps to the founder plan, otherwise standard; a plain webhook delivery has no line items, so it maps to founder. |
+| `NEXT_PUBLIC_META_PIXEL_ID` | Meta Events Manager, 5 to 32 digits. Unset or non-numeric renders no pixel. Static page, redeploy to apply. |
 | `ENGINE_OPENAI_MODEL`, `ENGINE_ANTHROPIC_MODEL`, `ENGINE_GEMINI_MODEL` | Model id overrides. Defaults: `gpt-5-mini`, `claude-haiku-4-5`, `gemini-2.5-flash`. |
 | `SEED_EMAIL` | Email the seed script creates a dev license for. Local only. |
 
 Never set provider API keys (OpenAI, Anthropic, Gemini) in the environment. Users supply their own in Settings.
+
+## API shape
+
+Every route under `/api/projects` and `/api/settings` goes through `src/app/api/_lib/with-license.ts`, which reads the `its_license` cookie first. Error bodies are `{ error: "<plain sentence>" }` and the client components show the sentence as-is; the two fixed strings are `401 { error: "unauthorized" }` and `404 { error: "not found" }`. Creates answer 201 (`POST /api/projects`, `POST /api/projects/[id]/prompts`). `GET /api/health` answers `{ ok: true, db }` with status 200, or 503 when the database does not answer. A project holds at most 25 active prompts (`PRODUCT.maxPromptsPerProject`); archived prompts do not count.
 
 ## Deploy
 
@@ -59,11 +79,11 @@ vercel          # preview
 vercel --prod   # production
 ```
 
-Set the variables above in the Vercel project first. Run `npm run migrate` once against the production `DATABASE_URL` (locally, with that value in your env) before the first deploy, and again after any schema change; the schema is idempotent.
+Set the variables above in the Vercel project first. Run `npm run migrate` once against the production `DATABASE_URL` (locally, with that value in your env) before the first deploy, and again after any schema change; the schema is idempotent. The `pg` path has only been exercised through its SQL on PGlite (Postgres 17 under WASM); the first migrate and seed against a real `DATABASE_URL` are the confirmation.
 
 ## Cron
 
-`vercel.json` schedules `GET /api/cron/daily` at `0 11 * * *` UTC (06:00 EDT, 07:00 EST). The route checks `Authorization: Bearer ${CRON_SECRET}`, which Vercel adds automatically when `CRON_SECRET` is set in the project. It runs every active project with daily runs enabled, at least one engine key and at least one active prompt, sequentially inside a 240 second budget (`maxDuration` 300).
+`vercel.json` schedules `GET /api/cron/daily` at `0 11 * * *` UTC (06:00 EDT, 07:00 EST). The route answers 500 when `CRON_SECRET` is unset, 401 without the right `Authorization: Bearer ${CRON_SECRET}`, then runs every active project with daily runs enabled, at least one engine key and at least one active prompt, sequentially inside a 240 second budget (`maxDuration` 300). It returns `{ started, finished, skipped, errors }`. A single project run can outlast the budget (25 prompts on three engines with a 90 s per-call timeout); Vercel then kills the function and that run row stays at `running`.
 
 ## Tests
 
@@ -73,8 +93,35 @@ npm run test:watch
 npm run typecheck   # tsc --noEmit
 ```
 
-Tests run in Node against an in-memory PGlite database with `db/schema.sql` applied; no external services are needed.
+Tests run in Node against an in-memory PGlite database with `db/schema.sql` applied; no external services are needed. Engine tests use fixtures shaped like the installed SDK types and a fake `fetch`.
+
+## Smoke test (PGlite fallback, no env file)
+
+This is the sequence the integrator ran on 2026-10-01 (63 assertions). Terminal 1 starts the server; terminal 2 seeds and drives it with curl. The key stays in a shell variable; do not write it to a file.
+
+```bash
+# terminal 1
+KEY_ENCRYPTION_SECRET=$(openssl rand -hex 32) CRON_SECRET=test NEXT_PUBLIC_BASE_URL=http://localhost:3111 npx next dev -p 3111
+
+# terminal 2, before the server's first database request
+B=http://localhost:3111
+KEY=$(KEY_ENCRYPTION_SECRET=$(openssl rand -hex 32) CRON_SECRET=test NEXT_PUBLIC_BASE_URL=$B npm run seed 2>&1 | awk '/License key/ {print $NF}')
+curl -s $B/api/health                                                    # {"ok":true,"db":true}
+curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'content-type: application/json' -d '{"key":"its_wrong"}' $B/api/license/activate   # 401
+curl -s -c jar -D - -o /dev/null -X POST -H 'content-type: application/json' -d "{\"key\":\"$KEY\"}" $B/api/license/activate | grep -i httponly
+PID=$(curl -s -b jar -X POST -H 'content-type: application/json' -d '{"brandName":"EVOIX","domain":"evoix.io","aliases":["EVOIX.io"],"competitorDomains":["fivesixten.com","minuttia.com"]}' $B/api/projects | python3 -c 'import sys,json; print(json.load(sys.stdin)["project"]["id"])')
+curl -s -b jar -X POST -H 'content-type: application/json' -d '{"texts":["What is EVOIX.io?","Best answer engine optimization tools for a small business"]}' $B/api/projects/$PID/prompts
+curl -s -b jar $B/api/projects/$PID/dashboard                            # latestRun null
+curl -s -b jar -X PUT -H 'content-type: application/json' -d '{"engine":"openai","apiKey":"sk-test-not-real-1234567890"}' $B/api/settings/keys   # hint 7890
+curl -s -b jar -X POST $B/api/projects/$PID/runs                         # status "failed", every result carries a redacted error
+curl -s -o /dev/null -w '%{http_code}\n' $B/api/cron/daily               # 401
+curl -s -H 'authorization: Bearer test' $B/api/cron/daily               # {"started":...,"finished":...,"skipped":...,"errors":[...]}
+curl -s -b jar $B/app/projects/$PID | grep -c '<h1[^>]*>EVOIX</h1>'      # 1
+rm jar
+```
+
+A second seed (`SEED_EMAIL=second@example.com npm run seed`) activated in its own jar gets 404 on the first license's project, dashboard and delete, and an empty project list.
 
 ## Server-only guard
 
-Server modules (db, crypto, license, engines, runs, email, stripe) start with `import "@/lib/server-only"` instead of the `server-only` package. The package throws under `tsx` and vitest because they do not resolve the `react-server` export condition; the local guard throws only when evaluated in a browser, which is the case that matters.
+Server modules (db, crypto, license, engines, runs, email, stripe) start with `import "@/lib/server-only"` instead of the `server-only` npm package, which is not a dependency. The package throws under `tsx` and vitest because they do not resolve the `react-server` export condition; the local guard throws only when evaluated in a browser, which is the case that matters.

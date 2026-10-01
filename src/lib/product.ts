@@ -9,6 +9,8 @@ export const PRODUCT = {
   founderPriceUsd: 69,
   founderKeys: 100,
   standardPriceUsd: 149,
+  /** Active prompts a project may hold; the landing page promises this number and the cron budget is sized to it. */
+  maxPromptsPerProject: 25,
   company: "EVOIX LLC",
   companyUrl: "https://evoix.io",
   supportEmail: "stephane@evoix.io",
