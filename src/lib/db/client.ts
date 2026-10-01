@@ -90,8 +90,29 @@ function createPgQueryable(connStr: string): Queryable {
   // PoolConfig.connectionString and .max: node_modules/@types/pg/index.d.ts lines 18 and 51.
   const pool = new Pool({ connectionString: url, max: 5 });
   state.close = () => pool.end();
+
+  /* Self-migration, same pattern as the site's audit/db.ts ensureTable(): the
+     first query on a fresh database applies db/schema.sql (every statement is
+     IF NOT EXISTS, so this is a no-op afterwards). Deploys then need no
+     separate migrate step and no credentials outside Vercel. A failed attempt
+     is retried on the next query instead of being cached. */
+  let schemaReady: Promise<void> | null = null;
+  const ensureSchema = (): Promise<void> => {
+    if (!schemaReady) {
+      schemaReady = pool
+        .query(readSchemaSql())
+        .then(() => undefined)
+        .catch((err: unknown) => {
+          schemaReady = null;
+          throw err;
+        });
+    }
+    return schemaReady;
+  };
+
   return {
     async query(text, params) {
+      await ensureSchema();
       // Pool.query(queryText, values): node_modules/@types/pg/index.d.ts line 231;
       // QueryResult.rows: line 105. With no values pg uses the simple protocol.
       const result = await pool.query<Record<string, unknown>>(text, params as unknown[] | undefined);
