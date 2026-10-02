@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     siteName: PRODUCT.name,
     title: TITLE,
     description: DESCRIPTION,
-    images: [{ url: SAMPLE_IMAGE, width: 1200, height: 720, alt: SAMPLE_ALT }],
+    images: [{ url: SAMPLE_IMAGE, width: 1567, height: 709, alt: SAMPLE_ALT }],
   },
 };
 
