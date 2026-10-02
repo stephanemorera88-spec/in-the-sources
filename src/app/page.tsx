@@ -33,7 +33,7 @@ const LEDGER_URL = "https://evoix.io/blog/who-is-the-king-of-aeo-dark-horse-entr
 /* Placeholder until the real screenshot lands. Swap the path and the alt:
    a PNG goes through next/image optimization automatically, while an SVG is
    served as-is (node_modules/next/dist/shared/lib/get-img-props.js line 280). */
-const SAMPLE_IMAGE = "/sample-dashboard.svg";
+const SAMPLE_IMAGE = "/sample-dashboard.png";
 const SAMPLE_ALT =
   "Sample dashboard for one project. Source-set inclusion and mention rates for ChatGPT, Claude and Gemini, a trend across runs, and a prompt table.";
 

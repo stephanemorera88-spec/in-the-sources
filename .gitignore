@@ -42,3 +42,4 @@ next-env.d.ts
 
 # local PGlite fallback database
 .pglite-data
+.env*.local
