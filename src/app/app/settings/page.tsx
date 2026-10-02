@@ -29,8 +29,10 @@ export default async function SettingsPage() {
       <AppHeader license={license} />
       <main>
         <PageShell className="py-10 md:py-14">
-          <p className="text-[14px] text-ink-50">
-            <Link href="/app">Projects</Link>
+          <p className="text-[14px] text-ink-70">
+            <Link href="/app" className="underline underline-offset-4 decoration-hairline-strong hover:text-ink">
+              All projects
+            </Link>
           </p>
           <h1 className="mt-2">Engine keys</h1>
           <p className="mt-4 max-w-2xl text-ink-70">

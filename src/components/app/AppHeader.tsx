@@ -20,6 +20,9 @@ export function AppHeader({ license }: { license: License }) {
           >
             {PLAN_LABELS[license.plan]}
           </span>
+          <Link href="/app" className="no-underline hover:underline">
+            Projects
+          </Link>
           <Link href="/app/settings" className="no-underline hover:underline">
             Settings
           </Link>

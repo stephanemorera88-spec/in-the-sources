@@ -146,8 +146,17 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
       <AppHeader license={license} />
       <main>
         <PageShell className="py-10 md:py-14">
-          <p className="text-[14px] text-ink-50">
-            <Link href="/app">Projects</Link> / <Link href={`/app/projects/${project.id}`}>{project.brandName}</Link>
+          <p className="text-[14px] text-ink-70">
+            <Link href="/app" className="underline underline-offset-4 decoration-hairline-strong hover:text-ink">
+              All projects
+            </Link>{" "}
+            /{" "}
+            <Link
+              href={`/app/projects/${project.id}`}
+              className="underline underline-offset-4 decoration-hairline-strong hover:text-ink"
+            >
+              {project.brandName}
+            </Link>
           </p>
           <h1 className="mt-2">Run of {formatDateTime(run.startedAt)}</h1>
           <p className="mt-3 max-w-2xl text-[15px] text-ink-70">
