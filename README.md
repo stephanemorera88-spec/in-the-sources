@@ -4,6 +4,11 @@ Bring-your-own-key AI visibility tracker, sold as a lifetime deal by EVOIX LLC. 
 
 How it works. A buyer pays once through a Stripe Payment Link, a webhook mints a license key, Resend emails it (the activation link carries the key in the URL fragment, `/activate#k=...`, so it never reaches a server log or an analytics script), and the key goes in an httpOnly cookie. In the app the user pastes their own OpenAI, Anthropic and Gemini API keys (encrypted at rest, never sent back to the browser), creates a project (brand, domain, aliases, competitor domains), adds prompts (typed, or ten suggested from the site text), and runs every prompt on every engine that has a key, with web search on. Per answer the app stores whether the brand was mentioned, its position in a numbered list, whether the brand's domain is in the cited sources, the full source list, the search results the engine saw, and the raw text. The dashboard leads with the source-set inclusion rate and the mention rate per engine, a trend across runs, a per-prompt table and a competitor domain leaderboard. A Vercel cron runs every project daily.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.png">
+  <img src="docs/architecture.png" width="960" alt="Architecture: a buyer pays through a Stripe Payment Link, the webhook mints a license in the Next.js app on Vercel, Resend emails the key, the app stores projects, runs and encrypted keys in Postgres, calls OpenAI, Anthropic and Gemini with the user's own keys, and a daily Vercel cron re-runs every project.">
+</picture>
+
 Maintained by Stephane Morera, EVOIX LLC. Source code is released under the GNU Affero General Public License v3.0 (`AGPL-3.0-only`, see `LICENSE`).
 
 The full contract (types, schema, routes, ownership, design) is in `SPEC.md`; its last section records the integration decisions made when the four modules were merged.
