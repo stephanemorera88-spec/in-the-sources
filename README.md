@@ -6,7 +6,7 @@ How it works. A buyer pays once through a Stripe Payment Link, a webhook mints a
 
 Maintained by Stephane Morera, EVOIX LLC. Source code is released under the GNU Affero General Public License v3.0 (`AGPL-3.0-only`, see `LICENSE`).
 
-The full contract (types, schema, routes, ownership, design) is in `SPEC.md`; its last section records the integration decisions made when the four builders' work was merged.
+The full contract (types, schema, routes, ownership, design) is in `SPEC.md`; its last section records the integration decisions made when the four modules were merged.
 
 ## Local setup
 
@@ -22,7 +22,7 @@ npm run migrate   # applies db/schema.sql (idempotent) to DATABASE_URL, or to th
 npm run seed      # creates a dev license for SEED_EMAIL (default stephane@evoix.io) and prints the key once
 ```
 
-Both scripts load env files through `@next/env`, so the usual local env file (dot env dot local) works without naming it on the command line. Copy `env.example` to that file to start. The example file is named `env.example`, without the leading dot, so the local credential guard that blocks every dotted env path leaves it readable; the guard also means Claude sessions cannot write the dotted name, which is why this README spells it out.
+Both scripts load env files through `@next/env`, so the usual local env file (dot env dot local) works without naming it on the command line. Copy `env.example` to that file to start. The example file is named `env.example`, without the leading dot, so a local tooling guard that blocks every dotted env path leaves it readable and committable; the usual local env file name still works at run time.
 
 Paste the printed key at `/activate` to open the app, then add your engine API keys in `/app/settings`. Saving a key needs `KEY_ENCRYPTION_SECRET` in the server's environment; without it the settings route answers 500 and the server log says why.
 
@@ -99,7 +99,7 @@ Tests run in Node against an in-memory PGlite database with `db/schema.sql` appl
 
 ## Smoke test (PGlite fallback, no env file)
 
-This is the sequence the integrator ran on 2026-10-01 (63 assertions). Terminal 1 starts the server; terminal 2 seeds and drives it with curl. The key stays in a shell variable; do not write it to a file.
+This is the sequence run at integration on 2026-10-01 (63 assertions). Terminal 1 starts the server; terminal 2 seeds and drives it with curl. The key stays in a shell variable; do not write it to a file.
 
 ```bash
 # terminal 1
