@@ -35,7 +35,7 @@ export { createLimiter } from "./limiter";
 export type { EngineOpts } from "./common";
 
 /*
- * Engines (builder A). askEngine dispatches to one provider with the user's
+ * Engines (module A). askEngine dispatches to one provider with the user's
  * own key; runProjectPrompts fans every active prompt out to every engine
  * that has a key, under a concurrency cap, and hands each ResultInput to the
  * caller. Neither ever throws for a failed call: the failure is the result.

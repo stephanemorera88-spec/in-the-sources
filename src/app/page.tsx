@@ -19,7 +19,7 @@ import { ANTHROPIC_MODEL, GEMINI_MODEL, OPENAI_MODEL } from "@/lib/engines/model
 import { PRODUCT } from "@/lib/product";
 
 /*
- * Landing page (builder D). Server component, statically prerendered. All
+ * Landing page (module D). Server component, statically prerendered. All
  * copy lives in this file so a review is one file long. Design per SPEC.md:
  * paper and ink, hairline-separated sections, no cards, no kickers, one ink
  * proof bezel around the dashboard image.

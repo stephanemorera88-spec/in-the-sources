@@ -5,7 +5,7 @@ import { runProjectPrompts } from "../engines";
 import { RUN_BUDGET_MS } from "../engines/models";
 
 /*
- * Run orchestration (builder A). Everything that can refuse a run happens
+ * Run orchestration (module A). Everything that can refuse a run happens
  * before the run row exists (unknown project, no keys, no prompts). Once
  * createRun has returned, nothing throws: the run ends "complete",
  * "partial" or "failed" and the final row is returned.

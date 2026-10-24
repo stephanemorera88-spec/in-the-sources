@@ -5,7 +5,7 @@ import { SUPPORT_MAILTO, SiteFooter, SiteHeader } from "@/components/marketing";
 import { PRODUCT } from "@/lib/product";
 
 /*
- * /thanks (builder D). The Stripe Payment Link sends the buyer here after
+ * /thanks (module D). The Stripe Payment Link sends the buyer here after
  * checkout. The webhook mints the key and Resend emails it, so this page only
  * has to say where to look and where to paste it. Not indexed.
  */

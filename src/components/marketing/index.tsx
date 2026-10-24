@@ -4,7 +4,7 @@ import { Button, PageShell } from "@/components/ui";
 import { PRODUCT } from "@/lib/product";
 
 /*
- * Marketing building blocks for the landing and thanks pages (builder D).
+ * Marketing building blocks for the landing and thanks pages (module D).
  * Server-safe: no hooks, no "use client". Same design rules as the ui
  * primitives (SPEC.md, "Design"): paper and ink, hairlines instead of cards,
  * 44px pills, no kickers, no gradients. Everything stacks at 390px.

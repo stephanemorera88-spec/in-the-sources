@@ -30,7 +30,7 @@ export type { Queryable } from "./client";
 export { InvalidInputError, NotFoundError } from "./errors";
 
 /*
- * Data layer (builder B). Parameterized SQL only. Every read and write of
+ * Data layer (module B). Parameterized SQL only. Every read and write of
  * projects, prompts, runs and results is scoped by licenseId through a join
  * or an EXISTS on projects: a wrong license gets null, false or an empty
  * list, never another license's row. No function trusts a license id that

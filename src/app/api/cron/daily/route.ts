@@ -6,7 +6,7 @@ import { RUN_BUDGET_MS } from "@/lib/engines/models";
 import { executeRun } from "@/lib/runs";
 
 /*
- * GET /api/cron/daily (builder D). Vercel calls it on the schedule in
+ * GET /api/cron/daily (module D). Vercel calls it on the schedule in
  * vercel.json and, when CRON_SECRET is set on the project, adds
  * `Authorization: Bearer ${CRON_SECRET}` to the request.
  *

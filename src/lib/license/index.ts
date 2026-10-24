@@ -7,7 +7,7 @@ import { InvalidInputError, NotFoundError } from "../db/errors";
 export { InvalidInputError, NotFoundError };
 
 /*
- * License session (builder B). The plaintext license key lives in an
+ * License session (module B). The plaintext license key lives in an
  * httpOnly cookie; pages call getCurrentLicense() and route handlers wrap
  * themselves in withLicense from src/app/api/_lib/with-license.ts (which
  * calls requireLicense() first and maps UnauthorizedError, zod errors and

@@ -4,7 +4,7 @@ import { activatePath } from "../activate-link";
 import { PRODUCT } from "../product";
 
 /*
- * Transactional email (builder B). The Resend client is built at call time
+ * Transactional email (module B). The Resend client is built at call time
  * so a missing RESEND_API_KEY fails on the first send, not at import.
  * Resend class: node_modules/resend/dist/index.d.mts line 2818, constructor(key?) line 2844,
  * `emails` line 2835; Emails.send(payload) line 1990 returns Response<{ id }>

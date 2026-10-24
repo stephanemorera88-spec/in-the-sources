@@ -2,7 +2,7 @@ import "../server-only";
 import Stripe from "stripe";
 
 /*
- * Stripe webhook verification (builder B). The app holds no Stripe secret
+ * Stripe webhook verification (module B). The app holds no Stripe secret
  * key in v1, so nothing here constructs a Stripe client.
  *
  * `Stripe.webhooks` is a static on the class (node_modules/stripe/esm/stripe.core.d.ts

@@ -3,7 +3,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { customAlphabet } from "nanoid";
 
 /*
- * Secrets at rest (builder B).
+ * Secrets at rest (module B).
  * encryptSecret / decryptSecret: AES-256-GCM with a 12-byte random iv and a
  * 16-byte auth tag, key = KEY_ENCRYPTION_SECRET (64 hex chars = 32 bytes),
  * blob = base64(iv | tag | ciphertext). The secret is read at call time so a

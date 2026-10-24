@@ -1,5 +1,5 @@
 /*
- * Error classes thrown by the data layer (builder B). They carry no
+ * Error classes thrown by the data layer (module B). They carry no
  * dependencies so any module can import them without a cycle.
  * `withLicense` in src/app/api/_lib/with-license.ts maps them to JSON responses:
  * InvalidInputError -> 400, NotFoundError -> 404.
